@@ -1,0 +1,8 @@
+{
+  "name": "frontend-academy",
+  "version": "1.0.0",
+  "main": "index.js",
+  "repository": "https://github.com/seeunyoun/frontend-academy.git",
+  "author": "SloaneY <tpdms717@gmail.com>",
+  "license": "MIT"
+}
