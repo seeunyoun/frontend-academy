@@ -1,21 +1,66 @@
-const container = document.querySelector("#root");
-const ajax = new XMLHttpRequest();
+type Store = {
+  currentPage: number;
+  feeds: NewsFeed[];
+}
+
+// <인터섹션> -> 공통(중복) 타입을 설정할 수 있다.
+type News = {
+  id: number;
+  time_ago: string;
+  url: string;
+  user: string;
+}
+
+type NewsFeed = News & {
+  comments_count: number;
+  points: number;
+  title: string;
+  read?: boolean; // optional
+}
+
+type NewsDetail = News & {
+  title: string;
+  content: string;
+  comments: NewsComment[];
+}
+
+type NewsComment = News & {
+  content: string;
+  comments: NewsComment[];
+  level: number;
+}
+
+const container:HTMLElement | null = document.querySelector("#root");
+const ajax:XMLHttpRequest = new XMLHttpRequest();
 const content = document.createElement("div");
 const NEWS_URL = "https://api.hnpwa.com/v0/news/1.json";
 const CONTENT_URL = "https://api.hnpwa.com/v0/item/@id.json";
-const store = {
+const store:Store = {
   currentPage: 1,
+  feeds: [],
 };
 
-function getData(url) {
+function getData<AjaxResponse>(url:string):AjaxResponse {
   ajax.open("GET", url, false);
   ajax.send();
 
   return JSON.parse(ajax.response);
 }
 
-function newsFeed() {
-  const newsFeed = getData(NEWS_URL); // 응답값을 객체로 바꾼다 (JSON 데이터만 객체로 바꿀 수 있음)
+function makeFeeds(feeds:NewsFeed[]):NewsFeed[] {
+  for (let i = 0; i < feeds.length; i++) {
+    feeds[i].read = false;
+  }
+  return feeds;
+}
+
+function updateView(html:string):void {
+  if(container) container.innerHTML = html;
+  else console.error('최상위 컨테이너가 없어 UI를 진행하지 못합니다.')
+}
+
+function newsFeed():void {
+  let newsFeed:NewsFeed[] = store.feeds; // 응답값을 객체로 바꾼다 (JSON 데이터만 객체로 바꿀 수 있음)
   const newsList = [];
   let templete = `
   <div class="bg-gray-600 min-h-screen">
@@ -38,9 +83,13 @@ function newsFeed() {
   </div>
   `;
 
+  if (!newsFeed.length) {
+    newsFeed = store.feeds = makeFeeds(getData<NewsFeed[]>(NEWS_URL));
+  }
+
   for (let i = (store.currentPage - 1) * 10; i < store.currentPage * 10; i++) {
     newsList.push(`
-    <div class="p-6 bg-white mt-6 rounded-lg shadow-md transition-colors duration-500 hover:bg-green-100">
+    <div class="p-6 ${newsFeed[i].read ? 'bg-red-500' : 'bg-white'} mt-6 rounded-lg shadow-md transition-colors duration-500 hover:bg-green-100">
       <div class="flex">
         <div class="flex-auto">
           <a href="#/show/${newsFeed[i].id}">${newsFeed[i].title}</a>
@@ -63,20 +112,20 @@ function newsFeed() {
   templete = templete.replace("{{__news_feed__}}", newsList.join(""));
   templete = templete.replace(
     "{{__prev_page__}}",
-    store.currentPage > 1 ? store.currentPage - 1 : 1
+    String(store.currentPage > 1 ? store.currentPage - 1 : 1)
   );
   templete = templete.replace(
     "{{__next_page__}}",
-    store.currentPage < 3 ? store.currentPage + 1 : 3
+    String(store.currentPage < 3 ? store.currentPage + 1 : 3)
   );
 
-  container.innerHTML = templete;
+  updateView(templete);
 }
 
 function newsDetail() {
   // 해쉬가 바뀌면! 함수가 실행되는 이벤트 추가
   const id = location.hash.substr(7); // 해시+id값에서 해시를 제외하는 문법!
-  const newsContent = getData(CONTENT_URL.replace("@id", id));
+  const newsContent = getData<NewsDetail>(CONTENT_URL.replace("@id", id));
   let templete = `
   <div class="bg-gray-600 min-h-screen pb-8">
     <div class="bg-white text-xl">
@@ -104,31 +153,37 @@ function newsDetail() {
   </div>
   `;
 
-  function makeComment(comments, called = 0) {
-    const commentString = [];
-
-    for (let i = 0; i < comments.length; i++) {
-      commentString.push(`
-      <div style="padding-left: ${called * 40}px;" class="mt-4">
-        <div class="text-gray-400">
-          <i class="fa fa-sort-up mr-2"></i>
-          <strong>${comments[i].user}</strong> ${comments[i].time_ago}
-        </div>
-          <p class="text-gray-700">${comments[i].content}</p>
-      </div>
-      `);
-
-      if (comments[i].comments.length > 0) {
-        commentString.push(makeComment(comments[i].comments, called + 1));
-      }
+  for (let i = 0; i < store.feeds.length; i++){
+    if (store.feeds[i].id === Number(id)) {
+      store.feeds[i].read = true;
+      break;
     }
-
-    return commentString.join("");
   }
-  container.innerHTML = templete.replace(
-    "{{__comments__}}",
-    makeComment(newsContent.comments)
-  );
+
+  updateView(templete.replace("{{__comments__}}", makeComment(newsContent.comments)));
+}
+
+function makeComment(comments:NewsComment[]):string {
+  const commentString = [];
+
+  for (let i = 0; i < comments.length; i++) {
+    const comment:NewsComment = comments[i];
+    commentString.push(`
+    <div style="padding-left: ${comment.level * 40}px;" class="mt-4">
+      <div class="text-gray-400">
+        <i class="fa fa-sort-up mr-2"></i>
+        <strong>${comment.user}</strong> ${comment.time_ago}
+      </div>
+        <p class="text-gray-700">${comment.content}</p>
+    </div>
+    `);
+
+    if (comment.comments.length > 0) {
+      commentString.push(makeComment(comment.comments));
+    }
+  }
+
+  return commentString.join("");
 }
 
 function router() {
