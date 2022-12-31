@@ -40,11 +40,33 @@ const store: Store = {
   feeds: [],
 }
 
-function getData<AjaxResponse>(url: string): AjaxResponse {
-  ajax.open('GET', url, false)
-  ajax.send()
+class Api {
+  url: string
+  ajax: XMLHttpRequest
 
-  return JSON.parse(ajax.response)
+  constructor(url: string) {
+    this.url = url
+    this.ajax = new XMLHttpRequest()
+  }
+
+  protected getRequest<AjaxResponse>(): AjaxResponse {
+    this.ajax.open('GET', this.url, false)
+    this.ajax.send()
+
+    return JSON.parse(this.ajax.response)
+  }
+}
+
+class NewsFeedApi extends Api {
+  getData(): NewsFeed[] {
+    return this.getRequest<NewsFeed[]>()
+  }
+}
+
+class NewsDetailApi extends Api {
+  getData(): NewsDetail {
+    return this.getRequest<NewsDetail>()
+  }
 }
 
 function makeFeeds(feeds: NewsFeed[]): NewsFeed[] {
@@ -60,6 +82,7 @@ function updateView(html: string): void {
 }
 
 function newsFeed(): void {
+  const api = new NewsFeedApi(NEWS_URL)
   let newsFeed: NewsFeed[] = store.feeds // 응답값을 객체로 바꾼다 (JSON 데이터만 객체로 바꿀 수 있음)
   const newsList = []
   let templete = `
@@ -84,7 +107,7 @@ function newsFeed(): void {
   `
 
   if (!newsFeed.length) {
-    newsFeed = store.feeds = makeFeeds(getData<NewsFeed[]>(NEWS_URL))
+    newsFeed = store.feeds = makeFeeds(api.getData())
   }
 
   for (let i = (store.currentPage - 1) * 10; i < store.currentPage * 10; i++) {
@@ -129,7 +152,8 @@ function newsFeed(): void {
 function newsDetail() {
   // 해쉬가 바뀌면! 함수가 실행되는 이벤트 추가
   const id = location.hash.substr(7) // 해시+id값에서 해시를 제외하는 문법!
-  const newsContent = getData<NewsDetail>(CONTENT_URL.replace('@id', id))
+  const api = new NewsDetailApi(CONTENT_URL.replace('@id', id))
+  const newsContent = api.getData()
   let templete = `
   <div class="bg-gray-600 min-h-screen pb-8">
     <div class="bg-white text-xl">
