@@ -1,67 +1,67 @@
-type Store = {
-  currentPage: number;
-  feeds: NewsFeed[];
+interface Store {
+  currentPage: number
+  feeds: NewsFeed[]
 }
 
 // <인터섹션> -> 공통(중복) 타입을 설정할 수 있다.
-type News = {
-  id: number;
-  time_ago: string;
-  url: string;
-  user: string;
+interface News {
+  readonly id: number
+  readonly time_ago: string
+  readonly url: string
+  readonly user: string
 }
 
-type NewsFeed = News & {
-  comments_count: number;
-  points: number;
-  title: string;
-  read?: boolean; // optional
+interface NewsFeed extends News {
+  readonly comments_count: number
+  readonly points: number
+  readonly title: string
+  read?: boolean // optional
 }
 
-type NewsDetail = News & {
-  title: string;
-  content: string;
-  comments: NewsComment[];
+interface NewsDetail extends News {
+  readonly title: string
+  readonly content: string
+  readonly comments: NewsComment[]
 }
 
-type NewsComment = News & {
-  content: string;
-  comments: NewsComment[];
-  level: number;
+interface NewsComment extends News {
+  readonly content: string
+  readonly comments: NewsComment[]
+  readonly level: number
 }
 
-const container:HTMLElement | null = document.querySelector("#root");
-const ajax:XMLHttpRequest = new XMLHttpRequest();
-const content = document.createElement("div");
-const NEWS_URL = "https://api.hnpwa.com/v0/news/1.json";
-const CONTENT_URL = "https://api.hnpwa.com/v0/item/@id.json";
-const store:Store = {
+const container: HTMLElement | null = document.querySelector('#root')
+const ajax: XMLHttpRequest = new XMLHttpRequest()
+const content = document.createElement('div')
+const NEWS_URL = 'https://api.hnpwa.com/v0/news/1.json'
+const CONTENT_URL = 'https://api.hnpwa.com/v0/item/@id.json'
+const store: Store = {
   currentPage: 1,
   feeds: [],
-};
-
-function getData<AjaxResponse>(url:string):AjaxResponse {
-  ajax.open("GET", url, false);
-  ajax.send();
-
-  return JSON.parse(ajax.response);
 }
 
-function makeFeeds(feeds:NewsFeed[]):NewsFeed[] {
+function getData<AjaxResponse>(url: string): AjaxResponse {
+  ajax.open('GET', url, false)
+  ajax.send()
+
+  return JSON.parse(ajax.response)
+}
+
+function makeFeeds(feeds: NewsFeed[]): NewsFeed[] {
   for (let i = 0; i < feeds.length; i++) {
-    feeds[i].read = false;
+    feeds[i].read = false
   }
-  return feeds;
+  return feeds
 }
 
-function updateView(html:string):void {
-  if(container) container.innerHTML = html;
+function updateView(html: string): void {
+  if (container) container.innerHTML = html
   else console.error('최상위 컨테이너가 없어 UI를 진행하지 못합니다.')
 }
 
-function newsFeed():void {
-  let newsFeed:NewsFeed[] = store.feeds; // 응답값을 객체로 바꾼다 (JSON 데이터만 객체로 바꿀 수 있음)
-  const newsList = [];
+function newsFeed(): void {
+  let newsFeed: NewsFeed[] = store.feeds // 응답값을 객체로 바꾼다 (JSON 데이터만 객체로 바꿀 수 있음)
+  const newsList = []
   let templete = `
   <div class="bg-gray-600 min-h-screen">
     <div class="bg-white text-xl">
@@ -81,21 +81,25 @@ function newsFeed():void {
       {{__news_feed__}}
     </div>
   </div>
-  `;
+  `
 
   if (!newsFeed.length) {
-    newsFeed = store.feeds = makeFeeds(getData<NewsFeed[]>(NEWS_URL));
+    newsFeed = store.feeds = makeFeeds(getData<NewsFeed[]>(NEWS_URL))
   }
 
   for (let i = (store.currentPage - 1) * 10; i < store.currentPage * 10; i++) {
     newsList.push(`
-    <div class="p-6 ${newsFeed[i].read ? 'bg-red-500' : 'bg-white'} mt-6 rounded-lg shadow-md transition-colors duration-500 hover:bg-green-100">
+    <div class="p-6 ${
+      newsFeed[i].read ? 'bg-red-500' : 'bg-white'
+    } mt-6 rounded-lg shadow-md transition-colors duration-500 hover:bg-green-100">
       <div class="flex">
         <div class="flex-auto">
           <a href="#/show/${newsFeed[i].id}">${newsFeed[i].title}</a>
         </div>
         <div class="text-center text-sm">
-          <div class="w-10 text-white bg-green-300 rounded-lg px-0 py-2">${newsFeed[i].comments_count}</div>
+          <div class="w-10 text-white bg-green-300 rounded-lg px-0 py-2">${
+            newsFeed[i].comments_count
+          }</div>
         </div>
       </div>
       <div class="flex mt-3">
@@ -106,26 +110,26 @@ function newsFeed():void {
         </div>
       </div>
     </div>
-    `);
+    `)
   }
 
-  templete = templete.replace("{{__news_feed__}}", newsList.join(""));
+  templete = templete.replace('{{__news_feed__}}', newsList.join(''))
   templete = templete.replace(
-    "{{__prev_page__}}",
-    String(store.currentPage > 1 ? store.currentPage - 1 : 1)
-  );
+    '{{__prev_page__}}',
+    String(store.currentPage > 1 ? store.currentPage - 1 : 1),
+  )
   templete = templete.replace(
-    "{{__next_page__}}",
-    String(store.currentPage < 3 ? store.currentPage + 1 : 3)
-  );
+    '{{__next_page__}}',
+    String(store.currentPage < 3 ? store.currentPage + 1 : 3),
+  )
 
-  updateView(templete);
+  updateView(templete)
 }
 
 function newsDetail() {
   // 해쉬가 바뀌면! 함수가 실행되는 이벤트 추가
-  const id = location.hash.substr(7); // 해시+id값에서 해시를 제외하는 문법!
-  const newsContent = getData<NewsDetail>(CONTENT_URL.replace("@id", id));
+  const id = location.hash.substr(7) // 해시+id값에서 해시를 제외하는 문법!
+  const newsContent = getData<NewsDetail>(CONTENT_URL.replace('@id', id))
   let templete = `
   <div class="bg-gray-600 min-h-screen pb-8">
     <div class="bg-white text-xl">
@@ -151,23 +155,25 @@ function newsDetail() {
       {{__comments__}}
     </div>
   </div>
-  `;
+  `
 
-  for (let i = 0; i < store.feeds.length; i++){
+  for (let i = 0; i < store.feeds.length; i++) {
     if (store.feeds[i].id === Number(id)) {
-      store.feeds[i].read = true;
-      break;
+      store.feeds[i].read = true
+      break
     }
   }
 
-  updateView(templete.replace("{{__comments__}}", makeComment(newsContent.comments)));
+  updateView(
+    templete.replace('{{__comments__}}', makeComment(newsContent.comments)),
+  )
 }
 
-function makeComment(comments:NewsComment[]):string {
-  const commentString = [];
+function makeComment(comments: NewsComment[]): string {
+  const commentString = []
 
   for (let i = 0; i < comments.length; i++) {
-    const comment:NewsComment = comments[i];
+    const comment: NewsComment = comments[i]
     commentString.push(`
     <div style="padding-left: ${comment.level * 40}px;" class="mt-4">
       <div class="text-gray-400">
@@ -176,28 +182,28 @@ function makeComment(comments:NewsComment[]):string {
       </div>
         <p class="text-gray-700">${comment.content}</p>
     </div>
-    `);
+    `)
 
     if (comment.comments.length > 0) {
-      commentString.push(makeComment(comment.comments));
+      commentString.push(makeComment(comment.comments))
     }
   }
 
-  return commentString.join("");
+  return commentString.join('')
 }
 
 function router() {
-  const routerPath = location.hash;
-  if (routerPath === "") {
-    newsFeed();
-  } else if (routerPath.indexOf("#/page/") >= 0) {
-    store.currentPage = Number(routerPath.substr(7)); // http://localhost:1234/#/page/3 페이지 뒤의 숫자만 출력하려면 7번째!
-    newsFeed();
+  const routerPath = location.hash
+  if (routerPath === '') {
+    newsFeed()
+  } else if (routerPath.indexOf('#/page/') >= 0) {
+    store.currentPage = Number(routerPath.substr(7)) // http://localhost:1234/#/page/3 페이지 뒤의 숫자만 출력하려면 7번째!
+    newsFeed()
   } else {
-    newsDetail();
+    newsDetail()
   }
 }
 
-window.addEventListener("hashchange", router);
+window.addEventListener('hashchange', router)
 
-router();
+router()
