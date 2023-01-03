@@ -71,7 +71,9 @@ class NewsDetailApi extends Api {
 
 class View {
   template: string
+  renderTemplate: string
   container: HTMLElement
+  htmlList: string[]
 
   constructor(containerId: string; template: string) {
     const containerElement = document.getElementById(containerId)
@@ -82,100 +84,112 @@ class View {
 
     this.container = containerElement;
     this.template = template
+    this.renderTemplate = template
+    this.htmlList = [];
   }
 
-  updateView(html: string): void {
-    this.container.innerHTML = html
+  updateView(): void {
+    this.container.innerHTML = this.renderTemplate
+    this.renderTemplate = this.template
+  }
+
+  addHtml(htmlString: string): void  {
+    this.htmlList.push(htmlString)
+  }
+
+  getHtml(): string {
+    const snapshot = this.htmlList.join('')
+    this.clearHtmlList()
+    return snapshot
+  }
+
+  clearHtmlList(): void {
+    this.htmlList = []
+  }
+
+  setTemplateData(key: string, value: string): void {
+    this.renderTemplate  = this.renderTemplate.replace(`{{__${key}__}}`, value)
   }
 }
 
 class NewsFeedView extends View {
-  constructor() {
-    const api = new NewsFeedApi(NEWS_URL)
-    let newsFeed: NewsFeed[] = store.feeds // 응답값을 객체로 바꾼다 (JSON 데이터만 객체로 바꿀 수 있음)
-    let templete = `
-    <div class="bg-gray-600 min-h-screen">
-      <div class="bg-white text-xl">
-        <div class="mx-auto px-4">
-          <div class="flex justify-between items-center py-6">
-            <div class="flex justify-start">
-              <h1 class="font-extrabold">Hacker News</h1>
-            </div>
-            <div>
-              <a href="#/page/{{__prev_page__}}" class="text-gray-500">Previous</a>
-              <a href="#/page/{{__next_page__}}" class="text-gray-500 ml-4">Next</a>
+  api: NewsFeedApi;
+  feeds: NewsFeed[];
+
+  constructor(containerId: string) {
+    let template = `
+      <div class="bg-gray-600 min-h-screen">
+        <div class="bg-white text-xl">
+          <div class="mx-auto px-4">
+            <div class="flex justify-between items-center py-6">
+              <div class="flex justify-start">
+                <h1 class="font-extrabold">Hacker News</h1>
+              </div>
+              <div>
+                <a href="#/page/{{__prev_page__}}" class="text-gray-500">Previous</a>
+                <a href="#/page/{{__next_page__}}" class="text-gray-500 ml-4">Next</a>
+              </div>
             </div>
           </div>
         </div>
+        <div class="p-4 text-2xl text-gray-700">
+          {{__news_feed__}}
+        </div>
       </div>
-      <div class="p-4 text-2xl text-gray-700">
-        {{__news_feed__}}
-      </div>
-    </div>
     `
 
-    if (!newsFeed.length) {
-      newsFeed = store.feeds = makeFeeds(api.getData())
+    super(containerId, template)
+
+    this.api = new NewsFeedApi(NEWS_URL)
+    this.feeds = store.feeds // 응답값을 객체로 바꾼다 (JSON 데이터만 객체로 바꿀 수 있음)
+
+    if (!this.feeds.length) {
+      this.feeds = store.feeds = this.api.getData()
+      this.makeFeeds()
     }
   }
 
   render(): void {
-    const newsList = []
-
-    for (
-      let i = (store.currentPage - 1) * 10;
-      i < store.currentPage * 10;
-      i++
-    ) {
-      newsList.push(`
-      <div class="p-6 ${
-        newsFeed[i].read ? 'bg-red-500' : 'bg-white'
-      } mt-6 rounded-lg shadow-md transition-colors duration-500 hover:bg-green-100">
+    for (let i = (store.currentPage - 1) * 10; i < store.currentPage * 10; i++) {
+      const { read, id, title, comments_count, user, points, time_ago } = this.feeds[i]
+      this.addHtml(`<div class="p-6 ${read ? 'bg-red-500' : 'bg-white'} mt-6 rounded-lg shadow-md transition-colors duration-500 hover:bg-green-100">
         <div class="flex">
           <div class="flex-auto">
-            <a href="#/show/${newsFeed[i].id}">${newsFeed[i].title}</a>
+            <a href="#/show/${id}">${title}</a>
           </div>
           <div class="text-center text-sm">
             <div class="w-10 text-white bg-green-300 rounded-lg px-0 py-2">${
-              newsFeed[i].comments_count
+              comments_count
             }</div>
           </div>
         </div>
         <div class="flex mt-3">
           <div class="grid grid-cols-3 text-sm text-gray-500">
-            <div><i class="fas fa-user mr-1">${newsFeed[i].user}</i></div>
-            <div><i class="fas fa-heart mr-1">${newsFeed[i].points}</i></div>
-            <div><i class="fas fa-clock mr-1">${newsFeed[i].time_ago}</i></div>
+            <div><i class="fas fa-user mr-1">${user}</i></div>
+            <div><i class="fas fa-heart mr-1">${points}</i></div>
+            <div><i class="fas fa-clock mr-1">${time_ago}</i></div>
           </div>
         </div>
-      </div>
-      `)
+      </div>`)
     }
 
-    templete = templete.replace('{{__news_feed__}}', newsList.join(''))
-    templete = templete.replace(
-      '{{__prev_page__}}',
-      String(store.currentPage > 1 ? store.currentPage - 1 : 1),
-    )
-    templete = templete.replace(
-      '{{__next_page__}}',
-      String(store.currentPage < 3 ? store.currentPage + 1 : 3),
-    )
+    this.setTemplateData('news_feed', this.getHtml())
+    this.setTemplateData('prev_page', String(store.currentPage > 1 ? store.currentPage - 1 : 1))
+    this.setTemplateData('next_page', String(store.currentPage < 3 ? store.currentPage + 1 : 3))
 
-    updateView(templete)
+    this.updateView()
   }
 
-  makeFeeds(feeds: NewsFeed[]): NewsFeed[] {
-    for (let i = 0; i < feeds.length; i++) {
-      feeds[i].read = false
+  makeFeeds(): void {
+    for (let i = 0; i < this.feeds.length; i++) {
+      this.feeds[i].read = false
     }
-    return feeds
   }
 }
 
 class NewsDetailView extends View {
-  constructor() {
-    let templete = `
+  constructor(containerId: string) {
+    let template = `
       <div class="bg-gray-600 min-h-screen pb-8">
         <div class="bg-white text-xl">
           <div class="mx-auto px-4">
@@ -184,7 +198,7 @@ class NewsDetailView extends View {
                 <h1 class="font-extrabold">Hacker News</h1>
               </div>
               <div class="itmes-center justify-end">
-                <a href="#/page/${store.currentPage}" class="text-gray-500">
+                <a href="#/page/{{__currentPage__}}" class="text-gray-500">
                   <i class="fa fa-times"></i>
                 </a>
               </div>
@@ -193,20 +207,22 @@ class NewsDetailView extends View {
         </div>
 
         <div class="h-full border rounded-xl bg-white m-6 p-4">
-          <h2>${newsContent.title}</h2>
+          <h2>{{__title__}}</h2>
           <div>
-            ${newsContent.content}
+            {{__content_}}
           </div>
           {{__comments__}}
         </div>
       </div>
     `
+
+    super(containerId, template)
   }
 
   render(): void {
     const id = location.hash.substr(7)
     const api = new NewsDetailApi(CONTENT_URL.replace('@id', id))
-    const newsContent = api.getData()
+    const newsDetail = api.getData()
 
     for (let i = 0; i < store.feeds.length; i++) {
       if (store.feeds[i].id === Number(id)) {
@@ -215,32 +231,32 @@ class NewsDetailView extends View {
       }
     }
 
-    updateView(
-      templete.replace('{{__comments__}}', makeComment(newsContent.comments)),
-    )
+    this.setTemplateData('comments', this.makeComment(newsDetail.comments))
+    this.setTemplateData('currentPage', String(store.currentPage))
+    this.setTemplateData('title', newsDetail.title)
+    this.setTemplateData('content', newsDetail.content)
+    this.updateView()
   }
 
   makeComment(comments: NewsComment[]): string {
-    const commentString = []
-
     for (let i = 0; i < comments.length; i++) {
       const comment: NewsComment = comments[i]
-      commentString.push(`
-      <div style="padding-left: ${comment.level * 40}px;" class="mt-4">
-        <div class="text-gray-400">
-          <i class="fa fa-sort-up mr-2"></i>
-          <strong>${comment.user}</strong> ${comment.time_ago}
+      this.addHtml(`
+        <div style="padding-left: ${comment.level * 40}px;" class="mt-4">
+          <div class="text-gray-400">
+            <i class="fa fa-sort-up mr-2"></i>
+            <strong>${comment.user}</strong> ${comment.time_ago}
+          </div>
+            <p class="text-gray-700">${comment.content}</p>
         </div>
-          <p class="text-gray-700">${comment.content}</p>
-      </div>
       `)
 
       if (comment.comments.length > 0) {
-        commentString.push(makeComment(comment.comments))
+        this.addHtml(this.makeComment(comment.comments))
       }
     }
 
-    return commentString.join('')
+    return this.getHtml()
   }
 }
 
